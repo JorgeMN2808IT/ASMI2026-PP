@@ -1,0 +1,747 @@
+EMU8086 GENERATED LISTING. MACHINE CODE <- SOURCE.
+ 
+BankTec.exe -- emu8086 assembler version: 4.08  
+ 
+[ 3/11/2026  --  3:50:48 PM ] 
+ 
+===================================================================================================
+[LINE]     LOC: MACHINE CODE                          SOURCE
+===================================================================================================
+ 
+[   1]        :                                       .MODEL SMALL
+[   2]        :                                       .STACK 100h
+[   3]        :                                       
+[   4]        :                                       ; ==================================================
+[   5]        :                                       ; CONSTANTES DE LA ESTRUCTURA "CUENTA"
+[   6]        :                                       ; ==================================================
+[   7]        :                                       MAX_CUENTAS EQU 10
+[   8]        :                                       TAM_NOMBRE  EQU 20
+[   9]        :                                       
+[  10]        :                                       OFF_NUMERO  EQU 0
+[  11]        :                                       OFF_NOMBRE  EQU 2
+[  12]        :                                       OFF_SALDO   EQU 22
+[  13]        :                                       OFF_ESTADO  EQU 24
+[  14]        :                                       TAM_CUENTA  EQU 25
+[  15]        :                                       
+[  16]        :                                       .CODE
+[  17]        :                                       
+[  18]        :                                       .DATA
+[  19]        :                                       ; -------------------------------
+[  20]        :                                       ; MENÚ
+[  21]        :                                       ; -------------------------------
+[  22]    0100: 0D 0A 3D 3D 3D 3D 3D 3D 3D 3D 3D 20   titulo          DB 13,10,'========= BANKTEC =========',13,10,'$'
+                42 41 4E 4B 54 45 43 20 3D 3D 3D 3D 
+                3D 3D 3D 3D 3D 0D 0A 24             
+[  23]    0120: 31 2E 20 43 72 65 61 72 20 63 75 65   opcion1         DB '1. Crear cuenta',13,10,'$'
+                6E 74 61 0D 0A 24                   
+[  24]    0132: 32 2E 20 44 65 70 6F 73 69 74 61 72   opcion2         DB '2. Depositar dinero',13,10,'$'
+                20 64 69 6E 65 72 6F 0D 0A 24       
+[  25]    0148: 33 2E 20 52 65 74 69 72 61 72 20 64   opcion3         DB '3. Retirar dinero',13,10,'$'
+                69 6E 65 72 6F 0D 0A 24             
+[  26]    015C: 34 2E 20 43 6F 6E 73 75 6C 74 61 72   opcion4         DB '4. Consultar saldo',13,10,'$'
+                20 73 61 6C 64 6F 0D 0A 24          
+[  27]    0171: 35 2E 20 4D 6F 73 74 72 61 72 20 72   opcion5         DB '5. Mostrar reporte general',13,10,'$'
+                65 70 6F 72 74 65 20 67 65 6E 65 72 
+                61 6C 0D 0A 24                      
+[  28]    018E: 36 2E 20 44 65 73 61 63 74 69 76 61   opcion6         DB '6. Desactivar cuenta',13,10,'$'
+                72 20 63 75 65 6E 74 61 0D 0A 24    
+[  29]    01A5: 37 2E 20 53 61 6C 69 72 0D 0A 24      opcion7         DB '7. Salir',13,10,'$'
+[  30]    01B0: 0D 0A 53 65 6C 65 63 63 69 6F 6E 65   pedirOpcion     DB 13,10,'Seleccione una opcion (1-7): $'
+                20 75 6E 61 20 6F 70 63 69 6F 6E 20 
+                28 31 2D 37 29 3A 20 24             
+[  31]    01D0: 0D 0A 4F 70 63 69 6F 6E 20 69 6E 76   opcionInvalida  DB 13,10,'Opcion invalida. Intente de nuevo.',13,10,'$'
+                61 6C 69 64 61 2E 20 49 6E 74 65 6E 
+                74 65 20 64 65 20 6E 75 65 76 6F 2E 
+                0D 0A 24                            
+[  32]        :                                       
+[  33]    01F7: 0D 0A 5B 43 72 65 61 72 20 63 75 65   msgCrear        DB 13,10,'[Crear cuenta]',13,10,'$'
+                6E 74 61 5D 0D 0A 24                
+[  34]    020A: 0D 0A 5B 44 65 70 6F 73 69 74 61 72   msgDepositar    DB 13,10,'[Depositar dinero]',13,10,'$'
+                20 64 69 6E 65 72 6F 5D 0D 0A 24    
+[  35]    0221: 0D 0A 5B 52 65 74 69 72 61 72 20 64   msgRetirar      DB 13,10,'[Retirar dinero]',13,10,'$'
+                69 6E 65 72 6F 5D 0D 0A 24          
+[  36]    0236: 0D 0A 5B 43 6F 6E 73 75 6C 74 61 72   msgConsultar    DB 13,10,'[Consultar saldo]',13,10,'$'
+                20 73 61 6C 64 6F 5D 0D 0A 24       
+[  37]    024C: 0D 0A 5B 4D 6F 73 74 72 61 72 20 72   msgReporte      DB 13,10,'[Mostrar reporte general]',13,10,'$'
+                65 70 6F 72 74 65 20 67 65 6E 65 72 
+                61 6C 5D 0D 0A 24                   
+[  38]    026A: 0D 0A 5B 44 65 73 61 63 74 69 76 61   msgDesactivar   DB 13,10,'[Desactivar cuenta]',13,10,'$'
+                72 20 63 75 65 6E 74 61 5D 0D 0A 24 
+                                                    
+[  39]    0282: 0D 0A 53 61 6C 69 65 6E 64 6F 20 64   msgSalir        DB 13,10,'Saliendo del sistema...',13,10,'$'
+                65 6C 20 73 69 73 74 65 6D 61 2E 2E 
+                2E 0D 0A 24                         
+[  40]        :                                       
+[  41]        :                                       ; -------------------------------
+[  42]        :                                       ; MENSAJES DE CREAR CUENTA
+[  43]        :                                       ; -------------------------------
+[  44]    029E: 0D 0A 49 6E 67 72 65 73 65 20 6E 75   msgPedirNumero      DB 13,10,'Ingrese numero de cuenta: $'
+                6D 65 72 6F 20 64 65 20 63 75 65 6E 
+                74 61 3A 20 24                      
+[  45]    02BB: 0D 0A 49 6E 67 72 65 73 65 20 6E 6F   msgPedirNombre      DB 13,10,'Ingrese nombre del titular (max 20): $'
+                6D 62 72 65 20 64 65 6C 20 74 69 74 
+                75 6C 61 72 20 28 6D 61 78 20 32 30 
+                29 3A 20 24                         
+[  46]    02E3: 0D 0A 49 6E 67 72 65 73 65 20 73 61   msgPedirSaldo       DB 13,10,'Ingrese saldo inicial: $'
+                6C 64 6F 20 69 6E 69 63 69 61 6C 3A 
+                20 24                               
+[  47]    02FD: 0D 0A 43 75 65 6E 74 61 20 63 72 65   msgCuentaCreada     DB 13,10,'Cuenta creada correctamente.',13,10,'$'
+                61 64 61 20 63 6F 72 72 65 63 74 61 
+                6D 65 6E 74 65 2E 0D 0A 24          
+[  48]    031E: 0D 0A 45 72 72 6F 72 3A 20 6E 75 6D   msgCuentaRepetida   DB 13,10,'Error: numero de cuenta repetido.',13,10,'$'
+                65 72 6F 20 64 65 20 63 75 65 6E 74 
+                61 20 72 65 70 65 74 69 64 6F 2E 0D 
+                0A 24                               
+[  49]    0344: 0D 0A 45 72 72 6F 72 3A 20 79 61 20   msgBancoLleno       DB 13,10,'Error: ya no se pueden crear mas cuentas.',13,10,'$'
+                6E 6F 20 73 65 20 70 75 65 64 65 6E 
+                20 63 72 65 61 72 20 6D 61 73 20 63 
+                75 65 6E 74 61 73 2E 0D 0A 24       
+[  50]    0372: 0D 0A 45 72 72 6F 72 3A 20 6E 6F 6D   msgNombreInvalido   DB 13,10,'Error: nombre invalido.',13,10,'$'
+                62 72 65 20 69 6E 76 61 6C 69 64 6F 
+                2E 0D 0A 24                         
+[  51]    038E: 0D 0A 45 72 72 6F 72 3A 20 76 61 6C   msgNumeroInvalido   DB 13,10,'Error: valor numerico invalido.',13,10,'$'
+                6F 72 20 6E 75 6D 65 72 69 63 6F 20 
+                69 6E 76 61 6C 69 64 6F 2E 0D 0A 24 
+                                                    
+[  52]        :                                       
+[  53]        :                                       ; -------------------------------
+[  54]        :                                       ; MENSAJES DE DEPOSITAR
+[  55]        :                                       ; -------------------------------
+[  56]    03B2: 0D 0A 49 6E 67 72 65 73 65 20 6E 75   msgPedirCuentaDep   DB 13,10,'Ingrese numero de cuenta a depositar: $'
+                6D 65 72 6F 20 64 65 20 63 75 65 6E 
+                74 61 20 61 20 64 65 70 6F 73 69 74 
+                61 72 3A 20 24                      
+[  57]    03DB: 0D 0A 49 6E 67 72 65 73 65 20 6D 6F   msgPedirMontoDep    DB 13,10,'Ingrese monto a depositar: $'
+                6E 74 6F 20 61 20 64 65 70 6F 73 69 
+                74 61 72 3A 20 24                   
+[  58]    03F9: 0D 0A 45 72 72 6F 72 3A 20 6C 61 20   msgCuentaNoExiste   DB 13,10,'Error: la cuenta no existe.',13,10,'$'
+                63 75 65 6E 74 61 20 6E 6F 20 65 78 
+                69 73 74 65 2E 0D 0A 24             
+[  59]    0419: 0D 0A 45 72 72 6F 72 3A 20 6C 61 20   msgCuentaInactiva   DB 13,10,'Error: la cuenta esta inactiva.',13,10,'$'
+                63 75 65 6E 74 61 20 65 73 74 61 20 
+                69 6E 61 63 74 69 76 61 2E 0D 0A 24 
+                                                    
+[  60]    043D: 0D 0A 45 72 72 6F 72 3A 20 65 6C 20   msgMontoInvalido    DB 13,10,'Error: el monto debe ser positivo.',13,10,'$'
+                6D 6F 6E 74 6F 20 64 65 62 65 20 73 
+                65 72 20 70 6F 73 69 74 69 76 6F 2E 
+                0D 0A 24                            
+[  61]    0464: 0D 0A 44 65 70 6F 73 69 74 6F 20 72   msgDepositoOK       DB 13,10,'Deposito realizado correctamente.',13,10,'$'
+                65 61 6C 69 7A 61 64 6F 20 63 6F 72 
+                72 65 63 74 61 6D 65 6E 74 65 2E 0D 
+                0A 24                               
+[  62]        :                                       
+[  63]        :                                       ; -------------------------------
+[  64]        :                                       ; MENSAJES GENERALES
+[  65]        :                                       ; -------------------------------
+[  66]    048A: 0D 0A 50 72 65 73 69 6F 6E 65 20 75   msgPresioneTecla    DB 13,10,'Presione una tecla para continuar...$'
+                6E 61 20 74 65 63 6C 61 20 70 61 72 
+                61 20 63 6F 6E 74 69 6E 75 61 72 2E 
+                2E 2E 24                            
+[  67]    04B1: 0D 0A 24                              saltoLinea          DB 13,10,'$'
+[  68]        :                                       
+[  69]        :                                       ; -------------------------------
+[  70]        :                                       ; ESTRUCTURA EN MEMORIA
+[  71]        :                                       ; Cada cuenta ocupa 25 bytes:
+[  72]        :                                       ; [0-1]   numero   (WORD)
+[  73]        :                                       ; [2-21]  nombre   (20 bytes)
+[  74]        :                                       ; [22-23] saldo    (WORD)
+[  75]        :                                       ; [24]    estado   (1=activa, 0=inactiva)
+[  76]        :                                       ; -------------------------------
+[  77]    04B4: 00 00 00 00 00 00 00 00 00 00 00 00   cuentas         DB MAX_CUENTAS * TAM_CUENTA DUP(0)
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00 00 00 
+                00 00 00 00 00 00 00 00 00 00       
+[  78]    05AE: 00                                    totalCuentas    DB 0
+[  79]        :                                       
+[  80]        :                                       ; -------------------------------
+[  81]        :                                       ; BUFFERS DE ENTRADA
+[  82]        :                                       ; INT 21h / AH=0Ah
+[  83]        :                                       ; -------------------------------
+[  84]    05AF: 05 00 00 00 00 00 00                  bufferNumero    DB 5,0,5 DUP(0)      ; hasta 5 digitos
+[  85]    05B6: 14 00 00 00 00 00 00 00 00 00 00 00   bufferNombre    DB 20,0,20 DUP(0)    ; hasta 20 chars
+                00 00 00 00 00 00 00 00 00 00       
+[  86]        :                                       
+[  87]        :                                       ; -------------------------------
+[  88]        :                                       ; VARIABLES AUXILIARES
+[  89]        :                                       ; -------------------------------
+[  90]    05CC: 00 00                                 tempNumero      DW 0
+[  91]    05CE: 00 00                                 tempSaldo       DW 0
+[  92]    05D0: 00 00                                 tempMonto       DW 0
+[  93]        :                                       
+[  94]    05D2:                                       MAIN PROC
+[  95]    05D2: B8 10 00                              MOV AX, @DATA
+[  96]    05D5: 8E D8                                 MOV DS, AX
+[  97]        :                                       
+[  98]    05D7:                                       MENU_PRINCIPAL:
+[  99]    05D7: E8 7E 02                              CALL LIMPIAR_PANTALLA
+[ 100]    05DA: E8 2A 02                              CALL MOSTRAR_MENU
+[ 101]    05DD: E8 67 02                              CALL LEER_OPCION
+[ 102]        :                                       
+[ 103]    05E0: 3C 31                                 CMP AL, '1'
+[ 104]    05E2: 74 24                                 JE OP_CREAR
+[ 105]        :                                       
+[ 106]    05E4: 3C 32                                 CMP AL, '2'
+[ 107]    05E6: 74 2B                                 JE OP_DEPOSITAR
+[ 108]        :                                       
+[ 109]    05E8: 3C 33                                 CMP AL, '3'
+[ 110]    05EA: 74 32                                 JE OP_RETIRAR
+[ 111]        :                                       
+[ 112]    05EC: 3C 34                                 CMP AL, '4'
+[ 113]    05EE: 74 3D                                 JE OP_CONSULTAR
+[ 114]        :                                       
+[ 115]    05F0: 3C 35                                 CMP AL, '5'
+[ 116]    05F2: 74 48                                 JE OP_REPORTE
+[ 117]        :                                       
+[ 118]    05F4: 3C 36                                 CMP AL, '6'
+[ 119]    05F6: 74 53                                 JE OP_DESACTIVAR
+[ 120]        :                                       
+[ 121]    05F8: 3C 37                                 CMP AL, '7'
+[ 122]    05FA: 74 5F                                 JE OP_SALIR
+[ 123]        :                                       
+[ 124]    05FC: BA D0 00                              LEA DX, opcionInvalida
+[ 125]    05FF: B4 09                                 MOV AH, 09h
+[ 126]    0601: CD 21                                 INT 21h
+[ 127]    0603: E8 46 02                              CALL PAUSA
+[ 128]    0606: EB CF                                 JMP MENU_PRINCIPAL
+[ 129]        :                                       
+[ 130]    0608:                                       OP_CREAR:
+[ 131]    0608: E8 4D 02                              CALL LIMPIAR_PANTALLA
+[ 132]    060B: E8 58 00                              CALL CREAR_CUENTA
+[ 133]    060E: E8 3B 02                              CALL PAUSA
+[ 134]    0611: EB C4                                 JMP MENU_PRINCIPAL
+[ 135]        :                                       
+[ 136]    0613:                                       OP_DEPOSITAR:
+[ 137]    0613: E8 42 02                              CALL LIMPIAR_PANTALLA
+[ 138]    0616: E8 FD 00                              CALL DEPOSITAR_DINERO
+[ 139]    0619: E8 30 02                              CALL PAUSA
+[ 140]    061C: EB B9                                 JMP MENU_PRINCIPAL
+[ 141]        :                                       
+[ 142]    061E:                                       OP_RETIRAR:
+[ 143]    061E: E8 37 02                              CALL LIMPIAR_PANTALLA
+[ 144]    0621: BA 21 01                              LEA DX, msgRetirar
+[ 145]    0624: B4 09                                 MOV AH, 09h
+[ 146]    0626: CD 21                                 INT 21h
+[ 147]    0628: E8 21 02                              CALL PAUSA
+[ 148]    062B: EB AA                                 JMP MENU_PRINCIPAL
+[ 149]        :                                       
+[ 150]    062D:                                       OP_CONSULTAR:
+[ 151]    062D: E8 28 02                              CALL LIMPIAR_PANTALLA
+[ 152]    0630: BA 36 01                              LEA DX, msgConsultar
+[ 153]    0633: B4 09                                 MOV AH, 09h
+[ 154]    0635: CD 21                                 INT 21h
+[ 155]    0637: E8 12 02                              CALL PAUSA
+[ 156]    063A: EB 9B                                 JMP MENU_PRINCIPAL
+[ 157]        :                                       
+[ 158]    063C:                                       OP_REPORTE:
+[ 159]    063C: E8 19 02                              CALL LIMPIAR_PANTALLA
+[ 160]    063F: BA 4C 01                              LEA DX, msgReporte
+[ 161]    0642: B4 09                                 MOV AH, 09h
+[ 162]    0644: CD 21                                 INT 21h
+[ 163]    0646: E8 03 02                              CALL PAUSA
+[ 164]    0649: EB 8C                                 JMP MENU_PRINCIPAL
+[ 165]        :                                       
+[ 166]    064B:                                       OP_DESACTIVAR:
+[ 167]    064B: E8 0A 02                              CALL LIMPIAR_PANTALLA
+[ 168]    064E: BA 6A 01                              LEA DX, msgDesactivar
+[ 169]    0651: B4 09                                 MOV AH, 09h
+[ 170]    0653: CD 21                                 INT 21h
+[ 171]    0655: E8 F4 01                              CALL PAUSA
+[ 172]    0658: E9 7C FF                              JMP MENU_PRINCIPAL
+[ 173]        :                                       
+[ 174]    065B:                                       OP_SALIR:
+[ 175]    065B: BA 82 01                              LEA DX, msgSalir
+[ 176]    065E: B4 09                                 MOV AH, 09h
+[ 177]    0660: CD 21                                 INT 21h
+[ 178]        :                                       
+[ 179]    0662: B4 4C                                 MOV AH, 4Ch
+[ 180]    0664: CD 21                                 INT 21h
+[ 181]        :                                       
+[ 182]        :                                       MAIN ENDP
+[ 183]        :                                       
+[ 184]        :                                       ; ==================================================
+[ 185]        :                                       ; 4.2.1 CREAR CUENTA
+[ 186]        :                                       ; Reglas:
+[ 187]        :                                       ; - no numeros repetidos
+[ 188]        :                                       ; - saldo inicial >= 0
+[ 189]        :                                       ; - inicia activa
+[ 190]        :                                       ; ==================================================
+[ 191]    0666:                                       CREAR_CUENTA PROC
+[ 192]    0666: BA F7 00                              LEA DX, msgCrear
+[ 193]    0669: B4 09                                 MOV AH, 09h
+[ 194]    066B: CD 21                                 INT 21h
+[ 195]        :                                       
+[ 196]        :                                       ; Verificar si ya hay 10 cuentas
+[ 197]    066D: A0 AE 04                              MOV AL, totalCuentas
+[ 198]    0670: 3C 0A                                 CMP AL, MAX_CUENTAS
+[ 199]    0672: 72 03 E9 7F 00                        JAE BANCO_LLENO
+[ 200]        :                                       
+[ 201]    0677:                                       PEDIR_NUMERO_CUENTA:
+[ 202]    0677: BA 9E 01                              LEA DX, msgPedirNumero
+[ 203]    067A: B4 09                                 MOV AH, 09h
+[ 204]    067C: CD 21                                 INT 21h
+[ 205]        :                                       
+[ 206]    067E: E8 2A 01                              CALL LEER_NUMERO
+[ 207]    0681: 73 03 E9 80 00                        JC NUMERO_INVALIDO_CREAR
+[ 208]        :                                       
+[ 209]    0686: A3 CC 04                              MOV tempNumero, AX
+[ 210]        :                                       
+[ 211]        :                                       ; Verificar que no exista repetido
+[ 212]    0689: E8 F1 00                              CALL BUSCAR_CUENTA
+[ 213]    068C: 73 70                                 JNC CUENTA_REPETIDA   ; si la encontró, está repetida
+[ 214]        :                                       
+[ 215]    068E:                                       PEDIR_NOMBRE_CUENTA:
+[ 216]    068E: BA BB 01                              LEA DX, msgPedirNombre
+[ 217]    0691: B4 09                                 MOV AH, 09h
+[ 218]    0693: CD 21                                 INT 21h
+[ 219]        :                                       
+[ 220]    0695: E8 5D 01                              CALL LEER_NOMBRE
+[ 221]    0698: 72 74                                 JC NOMBRE_INVALIDO_CREAR
+[ 222]        :                                       
+[ 223]    069A:                                       PEDIR_SALDO_CUENTA:
+[ 224]    069A: BA E3 01                              LEA DX, msgPedirSaldo
+[ 225]    069D: B4 09                                 MOV AH, 09h
+[ 226]    069F: CD 21                                 INT 21h
+[ 227]        :                                       
+[ 228]    06A1: E8 07 01                              CALL LEER_NUMERO
+[ 229]    06A4: 72 60                                 JC NUMERO_INVALIDO_CREAR
+[ 230]        :                                       
+[ 231]        :                                       ; saldo inicial >= 0
+[ 232]    06A6: A3 CE 04                              MOV tempSaldo, AX
+[ 233]        :                                       
+[ 234]        :                                       ; calcular direccion del nuevo registro
+[ 235]    06A9: E8 F0 00                              CALL OBTENER_DIRECCION_NUEVA_CUENTA
+[ 236]        :                                       ; retorna DI apuntando al nuevo espacio
+[ 237]        :                                       
+[ 238]        :                                       ; guardar numero
+[ 239]    06AC: A1 CC 04                              MOV AX, tempNumero
+[ 240]    06AF: 89 05                                 MOV [DI + OFF_NUMERO], AX
+[ 241]        :                                       
+[ 242]        :                                       ; limpiar nombre del registro
+[ 243]    06B1: 57                                    PUSH DI
+[ 244]    06B2: BE B8 04                              LEA SI, bufferNombre + 2
+[ 245]    06B5: B9 14 00                              MOV CX, TAM_NOMBRE
+[ 246]    06B8: 83 C7 02                              ADD DI, OFF_NOMBRE
+[ 247]        :                                       
+[ 248]    06BB:                                       LIMPIAR_NOMBRE_NUEVO:
+[ 249]    06BB: C6 05 00                              MOV BYTE PTR [DI], 0
+[ 250]    06BE: 47                                    INC DI
+[ 251]    06BF: E2 FA                                 LOOP LIMPIAR_NOMBRE_NUEVO
+[ 252]        :                                       
+[ 253]    06C1: 5F                                    POP DI
+[ 254]        :                                       
+[ 255]        :                                       ; copiar nombre
+[ 256]    06C2: BE B8 04                              LEA SI, bufferNombre + 2
+[ 257]    06C5: 83 C7 02                              ADD DI, OFF_NOMBRE
+[ 258]    06C8: 32 ED                                 XOR CH, CH
+[ 259]    06CA: 8A 0E B7 04                           MOV CL, bufferNombre + 1
+[ 260]        :                                       
+[ 261]    06CE:                                       COPIAR_NOMBRE_NUEVO:
+[ 262]    06CE: 80 F9 00                              CMP CL, 0
+[ 263]    06D1: 74 0A                                 JE FIN_COPIAR_NOMBRE_NUEVO
+[ 264]    06D3: 8A 04                                 MOV AL, [SI]
+[ 265]    06D5: 88 05                                 MOV [DI], AL
+[ 266]    06D7: 46                                    INC SI
+[ 267]    06D8: 47                                    INC DI
+[ 268]    06D9: FE C9                                 DEC CL
+[ 269]    06DB: EB F1                                 JMP COPIAR_NOMBRE_NUEVO
+[ 270]        :                                       
+[ 271]    06DD:                                       FIN_COPIAR_NOMBRE_NUEVO:
+[ 272]        :                                       ; guardar saldo
+[ 273]    06DD: E8 BC 00                              CALL OBTENER_DIRECCION_NUEVA_CUENTA
+[ 274]    06E0: A1 CE 04                              MOV AX, tempSaldo
+[ 275]    06E3: 89 45 16                              MOV [DI + OFF_SALDO], AX
+[ 276]        :                                       
+[ 277]        :                                       ; estado = activa
+[ 278]    06E6: C6 45 18 01                           MOV BYTE PTR [DI + OFF_ESTADO], 1
+[ 279]        :                                       
+[ 280]        :                                       ; aumentar total
+[ 281]    06EA: FE 06 AE 04                           INC totalCuentas
+[ 282]        :                                       
+[ 283]    06EE: BA FD 01                              LEA DX, msgCuentaCreada
+[ 284]    06F1: B4 09                                 MOV AH, 09h
+[ 285]    06F3: CD 21                                 INT 21h
+[ 286]    06F5: C3                                    RET
+[ 287]        :                                       
+[ 288]    06F6:                                       BANCO_LLENO:
+[ 289]    06F6: BA 44 02                              LEA DX, msgBancoLleno
+[ 290]    06F9: B4 09                                 MOV AH, 09h
+[ 291]    06FB: CD 21                                 INT 21h
+[ 292]    06FD: C3                                    RET
+[ 293]        :                                       
+[ 294]    06FE:                                       CUENTA_REPETIDA:
+[ 295]    06FE: BA 1E 02                              LEA DX, msgCuentaRepetida
+[ 296]    0701: B4 09                                 MOV AH, 09h
+[ 297]    0703: CD 21                                 INT 21h
+[ 298]    0705: C3                                    RET
+[ 299]        :                                       
+[ 300]    0706:                                       NUMERO_INVALIDO_CREAR:
+[ 301]    0706: BA 8E 02                              LEA DX, msgNumeroInvalido
+[ 302]    0709: B4 09                                 MOV AH, 09h
+[ 303]    070B: CD 21                                 INT 21h
+[ 304]    070D: C3                                    RET
+[ 305]        :                                       
+[ 306]    070E:                                       NOMBRE_INVALIDO_CREAR:
+[ 307]    070E: BA 72 02                              LEA DX, msgNombreInvalido
+[ 308]    0711: B4 09                                 MOV AH, 09h
+[ 309]    0713: CD 21                                 INT 21h
+[ 310]    0715: C3                                    RET
+[ 311]        :                                       
+[ 312]        :                                       CREAR_CUENTA ENDP
+[ 313]        :                                       
+[ 314]        :                                       ; ==================================================
+[ 315]        :                                       ; 4.2.2 DEPOSITAR DINERO
+[ 316]        :                                       ; Reglas:
+[ 317]        :                                       ; - solo cuentas activas
+[ 318]        :                                       ; - monto positivo
+[ 319]        :                                       ; ==================================================
+[ 320]    0716:                                       DEPOSITAR_DINERO PROC
+[ 321]    0716: BA 0A 01                              LEA DX, msgDepositar
+[ 322]    0719: B4 09                                 MOV AH, 09h
+[ 323]    071B: CD 21                                 INT 21h
+[ 324]        :                                       
+[ 325]        :                                       ; pedir numero de cuenta
+[ 326]    071D: BA B2 02                              LEA DX, msgPedirCuentaDep
+[ 327]    0720: B4 09                                 MOV AH, 09h
+[ 328]    0722: CD 21                                 INT 21h
+[ 329]        :                                       
+[ 330]    0724: E8 84 00                              CALL LEER_NUMERO
+[ 331]    0727: 72 4C                                 JC NUMERO_INVALIDO_DEP
+[ 332]        :                                       
+[ 333]    0729: A3 CC 04                              MOV tempNumero, AX
+[ 334]        :                                       
+[ 335]        :                                       ; buscar cuenta
+[ 336]    072C: E8 4E 00                              CALL BUSCAR_CUENTA
+[ 337]    072F: 72 2C                                 JC CUENTA_NO_EXISTE_DEP
+[ 338]        :                                       
+[ 339]        :                                       ; DI queda apuntando a la cuenta encontrada
+[ 340]    0731: 80 7D 18 01                           CMP BYTE PTR [DI + OFF_ESTADO], 1
+[ 341]    0735: 75 2E                                 JNE CUENTA_INACTIVA_DEP
+[ 342]        :                                       
+[ 343]        :                                       ; pedir monto
+[ 344]    0737: BA DB 02                              LEA DX, msgPedirMontoDep
+[ 345]    073A: B4 09                                 MOV AH, 09h
+[ 346]    073C: CD 21                                 INT 21h
+[ 347]        :                                       
+[ 348]    073E: E8 6A 00                              CALL LEER_NUMERO
+[ 349]    0741: 72 32                                 JC NUMERO_INVALIDO_DEP
+[ 350]        :                                       
+[ 351]    0743: 3D 00 00                              CMP AX, 0
+[ 352]    0746: 74 25                                 JE MONTO_INVALIDO_DEP
+[ 353]        :                                       
+[ 354]    0748: A3 D0 04                              MOV tempMonto, AX
+[ 355]        :                                       
+[ 356]        :                                       ; saldo = saldo + monto
+[ 357]    074B: 8B 45 16                              MOV AX, [DI + OFF_SALDO]
+[ 358]    074E: 03 06 D0 04                           ADD AX, tempMonto
+[ 359]    0752: 89 45 16                              MOV [DI + OFF_SALDO], AX
+[ 360]        :                                       
+[ 361]    0755: BA 64 03                              LEA DX, msgDepositoOK
+[ 362]    0758: B4 09                                 MOV AH, 09h
+[ 363]    075A: CD 21                                 INT 21h
+[ 364]    075C: C3                                    RET
+[ 365]        :                                       
+[ 366]    075D:                                       CUENTA_NO_EXISTE_DEP:
+[ 367]    075D: BA F9 02                              LEA DX, msgCuentaNoExiste
+[ 368]    0760: B4 09                                 MOV AH, 09h
+[ 369]    0762: CD 21                                 INT 21h
+[ 370]    0764: C3                                    RET
+[ 371]        :                                       
+[ 372]    0765:                                       CUENTA_INACTIVA_DEP:
+[ 373]    0765: BA 19 03                              LEA DX, msgCuentaInactiva
+[ 374]    0768: B4 09                                 MOV AH, 09h
+[ 375]    076A: CD 21                                 INT 21h
+[ 376]    076C: C3                                    RET
+[ 377]        :                                       
+[ 378]    076D:                                       MONTO_INVALIDO_DEP:
+[ 379]    076D: BA 3D 03                              LEA DX, msgMontoInvalido
+[ 380]    0770: B4 09                                 MOV AH, 09h
+[ 381]    0772: CD 21                                 INT 21h
+[ 382]    0774: C3                                    RET
+[ 383]        :                                       
+[ 384]    0775:                                       NUMERO_INVALIDO_DEP:
+[ 385]    0775: BA 8E 02                              LEA DX, msgNumeroInvalido
+[ 386]    0778: B4 09                                 MOV AH, 09h
+[ 387]    077A: CD 21                                 INT 21h
+[ 388]    077C: C3                                    RET
+[ 389]        :                                       
+[ 390]        :                                       DEPOSITAR_DINERO ENDP
+[ 391]        :                                       
+[ 392]        :                                       ; ==================================================
+[ 393]        :                                       ; BUSCAR_CUENTA
+[ 394]        :                                       ; Entrada:
+[ 395]        :                                       ;   tempNumero = numero a buscar
+[ 396]        :                                       ; Salida:
+[ 397]        :                                       ;   CF = 0 si encuentra
+[ 398]        :                                       ;   CF = 1 si no encuentra
+[ 399]        :                                       ;   DI = direccion de la cuenta si existe
+[ 400]        :                                       ; ==================================================
+[ 401]    077D:                                       BUSCAR_CUENTA PROC
+[ 402]    077D: BF B4 03                              LEA DI, cuentas
+[ 403]    0780: 32 ED                                 XOR CH, CH
+[ 404]    0782: 8A 0E AE 04                           MOV CL, totalCuentas
+[ 405]        :                                       
+[ 406]    0786: 80 F9 00                              CMP CL, 0
+[ 407]    0789: 74 0D                                 JE NO_ENCONTRADA
+[ 408]        :                                       
+[ 409]    078B:                                       BUSCAR_LOOP:
+[ 410]    078B: 8B 05                                 MOV AX, [DI + OFF_NUMERO]
+[ 411]    078D: 3B 06 CC 04                           CMP AX, tempNumero
+[ 412]    0791: 74 07                                 JE ENCONTRADA
+[ 413]        :                                       
+[ 414]    0793: 83 C7 19                              ADD DI, TAM_CUENTA
+[ 415]    0796: E2 F3                                 LOOP BUSCAR_LOOP
+[ 416]        :                                       
+[ 417]    0798:                                       NO_ENCONTRADA:
+[ 418]    0798: F9                                    STC
+[ 419]    0799: C3                                    RET
+[ 420]        :                                       
+[ 421]    079A:                                       ENCONTRADA:
+[ 422]    079A: F8                                    CLC
+[ 423]    079B: C3                                    RET
+[ 424]        :                                       
+[ 425]        :                                       BUSCAR_CUENTA ENDP
+[ 426]        :                                       
+[ 427]        :                                       ; ==================================================
+[ 428]        :                                       ; OBTENER_DIRECCION_NUEVA_CUENTA
+[ 429]        :                                       ; Salida:
+[ 430]        :                                       ;   DI = direccion del siguiente espacio libre
+[ 431]        :                                       ; ==================================================
+[ 432]    079C:                                       OBTENER_DIRECCION_NUEVA_CUENTA PROC
+[ 433]    079C: BF B4 03                              LEA DI, cuentas
+[ 434]        :                                       
+[ 435]    079F: 33 C0                                 XOR AX, AX
+[ 436]    07A1: A0 AE 04                              MOV AL, totalCuentas
+[ 437]        :                                       
+[ 438]    07A4: B3 19                                 MOV BL, TAM_CUENTA
+[ 439]    07A6: F6 E3                                 MUL BL          ; AX = totalCuentas * TAM_CUENTA
+[ 440]        :                                       
+[ 441]    07A8: 03 F8                                 ADD DI, AX
+[ 442]    07AA: C3                                    RET
+[ 443]        :                                       OBTENER_DIRECCION_NUEVA_CUENTA ENDP
+[ 444]        :                                       
+[ 445]        :                                       ; ==================================================
+[ 446]        :                                       ; LEER_NUMERO
+[ 447]        :                                       ; Lee un numero positivo desde teclado
+[ 448]        :                                       ; usando buffer DOS y convierte ASCII -> numero
+[ 449]        :                                       ;
+[ 450]        :                                       ; Salida:
+[ 451]        :                                       ;   AX = valor
+[ 452]        :                                       ;   CF = 0 correcto
+[ 453]        :                                       ;   CF = 1 invalido
+[ 454]        :                                       ; ==================================================
+[ 455]    07AB:                                       LEER_NUMERO PROC
+[ 456]    07AB: BA AF 04                              LEA DX, bufferNumero
+[ 457]    07AE: B4 0A                                 MOV AH, 0Ah
+[ 458]    07B0: CD 21                                 INT 21h
+[ 459]        :                                       
+[ 460]    07B2: 33 C0                                 XOR AX, AX
+[ 461]    07B4: 33 DB                                 XOR BX, BX
+[ 462]    07B6: 33 C9                                 XOR CX, CX
+[ 463]    07B8: 33 D2                                 XOR DX, DX
+[ 464]        :                                       
+[ 465]    07BA: 8A 0E B0 04                           MOV CL, bufferNumero + 1
+[ 466]    07BE: 80 F9 00                              CMP CL, 0
+[ 467]    07C1: 74 30                                 JE NUMERO_INVALIDO
+[ 468]        :                                       
+[ 469]    07C3: BE B1 04                              LEA SI, bufferNumero + 2
+[ 470]    07C6: 33 C0                                 XOR AX, AX
+[ 471]        :                                       
+[ 472]    07C8:                                       CONVERTIR_LOOP:
+[ 473]    07C8: 8A 1C                                 MOV BL, [SI]
+[ 474]        :                                       
+[ 475]    07CA: 80 FB 30                              CMP BL, '0'
+[ 476]    07CD: 72 24                                 JB NUMERO_INVALIDO
+[ 477]        :                                       
+[ 478]    07CF: 80 FB 39                              CMP BL, '9'
+[ 479]    07D2: 77 1F                                 JA NUMERO_INVALIDO
+[ 480]        :                                       
+[ 481]    07D4: 80 EB 30                              SUB BL, '0'
+[ 482]        :                                       
+[ 483]    07D7: BA 00 00                              MOV DX, 0
+[ 484]    07DA: B9 0A 00                              MOV CX, 10
+[ 485]    07DD: F7 E1                                 MUL CX              ; AX = AX * 10
+[ 486]    07DF: 83 FA 00                              CMP DX, 0
+[ 487]    07E2: 75 0F                                 JNE NUMERO_INVALIDO
+[ 488]        :                                       
+[ 489]    07E4: 32 FF                                 XOR BH, BH
+[ 490]    07E6: 03 C3                                 ADD AX, BX
+[ 491]    07E8: 72 09                                 JC NUMERO_INVALIDO
+[ 492]        :                                       
+[ 493]    07EA: 46                                    INC SI
+[ 494]    07EB: FE 0E B0 04                           DEC BYTE PTR [bufferNumero + 1]
+[ 495]    07EF: 75 D7                                 JNZ CONVERTIR_LOOP
+[ 496]        :                                       
+[ 497]    07F1: F8                                    CLC
+[ 498]    07F2: C3                                    RET
+[ 499]        :                                       
+[ 500]    07F3:                                       NUMERO_INVALIDO:
+[ 501]    07F3: F9                                    STC
+[ 502]    07F4: C3                                    RET
+[ 503]        :                                       
+[ 504]        :                                       LEER_NUMERO ENDP
+[ 505]        :                                       
+[ 506]        :                                       ; ==================================================
+[ 507]        :                                       ; LEER_NOMBRE
+[ 508]        :                                       ; Lee nombre con buffer DOS.
+[ 509]        :                                       ; Debe tener al menos 1 caracter.
+[ 510]        :                                       ; Salida:
+[ 511]        :                                       ;   CF = 0 correcto
+[ 512]        :                                       ;   CF = 1 invalido
+[ 513]        :                                       ; ==================================================
+[ 514]    07F5:                                       LEER_NOMBRE PROC
+[ 515]    07F5: BA B6 04                              LEA DX, bufferNombre
+[ 516]    07F8: B4 0A                                 MOV AH, 0Ah
+[ 517]    07FA: CD 21                                 INT 21h
+[ 518]        :                                       
+[ 519]    07FC: A0 B7 04                              MOV AL, bufferNombre + 1
+[ 520]    07FF: 3C 00                                 CMP AL, 0
+[ 521]    0801: 74 02                                 JE NOMBRE_INVALIDO
+[ 522]        :                                       
+[ 523]    0803: F8                                    CLC
+[ 524]    0804: C3                                    RET
+[ 525]        :                                       
+[ 526]    0805:                                       NOMBRE_INVALIDO:
+[ 527]    0805: F9                                    STC
+[ 528]    0806: C3                                    RET
+[ 529]        :                                       
+[ 530]        :                                       LEER_NOMBRE ENDP
+[ 531]        :                                       
+[ 532]        :                                       ; ==================================================
+[ 533]        :                                       ; MOSTRAR_MENU
+[ 534]        :                                       ; ==================================================
+[ 535]    0807:                                       MOSTRAR_MENU PROC
+[ 536]    0807: BA 00 00                              LEA DX, titulo
+[ 537]    080A: B4 09                                 MOV AH, 09h
+[ 538]    080C: CD 21                                 INT 21h
+[ 539]        :                                       
+[ 540]    080E: BA 20 00                              LEA DX, opcion1
+[ 541]    0811: B4 09                                 MOV AH, 09h
+[ 542]    0813: CD 21                                 INT 21h
+[ 543]        :                                       
+[ 544]    0815: BA 32 00                              LEA DX, opcion2
+[ 545]    0818: B4 09                                 MOV AH, 09h
+[ 546]    081A: CD 21                                 INT 21h
+[ 547]        :                                       
+[ 548]    081C: BA 48 00                              LEA DX, opcion3
+[ 549]    081F: B4 09                                 MOV AH, 09h
+[ 550]    0821: CD 21                                 INT 21h
+[ 551]        :                                       
+[ 552]    0823: BA 5C 00                              LEA DX, opcion4
+[ 553]    0826: B4 09                                 MOV AH, 09h
+[ 554]    0828: CD 21                                 INT 21h
+[ 555]        :                                       
+[ 556]    082A: BA 71 00                              LEA DX, opcion5
+[ 557]    082D: B4 09                                 MOV AH, 09h
+[ 558]    082F: CD 21                                 INT 21h
+[ 559]        :                                       
+[ 560]    0831: BA 8E 00                              LEA DX, opcion6
+[ 561]    0834: B4 09                                 MOV AH, 09h
+[ 562]    0836: CD 21                                 INT 21h
+[ 563]        :                                       
+[ 564]    0838: BA A5 00                              LEA DX, opcion7
+[ 565]    083B: B4 09                                 MOV AH, 09h
+[ 566]    083D: CD 21                                 INT 21h
+[ 567]        :                                       
+[ 568]    083F: BA B0 00                              LEA DX, pedirOpcion
+[ 569]    0842: B4 09                                 MOV AH, 09h
+[ 570]    0844: CD 21                                 INT 21h
+[ 571]        :                                       
+[ 572]    0846: C3                                    RET
+[ 573]        :                                       MOSTRAR_MENU ENDP
+[ 574]        :                                       
+[ 575]        :                                       ; ==================================================
+[ 576]        :                                       ; LEER_OPCION
+[ 577]        :                                       ; ==================================================
+[ 578]    0847:                                       LEER_OPCION PROC
+[ 579]    0847: B4 01                                 MOV AH, 01h
+[ 580]    0849: CD 21                                 INT 21h
+[ 581]    084B: C3                                    RET
+[ 582]        :                                       LEER_OPCION ENDP
+[ 583]        :                                       
+[ 584]        :                                       ; ==================================================
+[ 585]        :                                       ; PAUSA
+[ 586]        :                                       ; ==================================================
+[ 587]    084C:                                       PAUSA PROC
+[ 588]    084C: BA 8A 03                              LEA DX, msgPresioneTecla
+[ 589]    084F: B4 09                                 MOV AH, 09h
+[ 590]    0851: CD 21                                 INT 21h
+[ 591]        :                                       
+[ 592]    0853: B4 08                                 MOV AH, 08h
+[ 593]    0855: CD 21                                 INT 21h
+[ 594]    0857: C3                                    RET
+[ 595]        :                                       PAUSA ENDP
+[ 596]        :                                       
+[ 597]        :                                       ; ==================================================
+[ 598]        :                                       ; LIMPIAR_PANTALLA
+[ 599]        :                                       ; ==================================================
+[ 600]    0858:                                       LIMPIAR_PANTALLA PROC
+[ 601]    0858: B4 00                                 MOV AH, 00h
+[ 602]    085A: B0 03                                 MOV AL, 03h
+[ 603]    085C: CD 10                                 INT 10h
+[ 604]    085E: C3                                    RET
+[ 605]        :                                       LIMPIAR_PANTALLA ENDP
+[ 606]        :                                       
+[ 607]        :                                       END MAIN
+[ 608]        :                                       
+ 
+===================================================================================================
+ 
+EXE HEADER - bytes from 0000 to 01FF inclusive.
+
+0000: 4D      -   exe signature (M)
+0001: 5A      -   exe signature (Z)
+0002: 5F      -   bytes on last page (l.byte)
+0003: 00      -   bytes on last page (h.byte)
+0004: 06      -   512 byte pages in file (l.byte)
+0005: 00      -   512 byte pages in file (h.byte)
+0006: 01      -   relocations (l.byte)
+0007: 00      -   relocations (h.byte)
+0008: 20      -   paragraphs in header (l.byte)
+0009: 00      -   paragraphs in header (h.byte)
+000A: 00      -   minimum memory (l.byte)
+000B: 00      -   minimum memory (h.byte)
+000C: FF      -   maximum memory (l.byte)
+000D: FF      -   maximum memory (h.byte)
+000E: 00      -   SS - stack segment (l.byte)
+000F: 00      -   SS - stack segment (h.byte)
+0010: 00      -   SP - stack pointer (l.byte)
+0011: 01      -   SP - stack pointer (h.byte)
+0012: FD      -   check sum (l.byte)
+0013: 79      -   check sum (h.byte)
+0014: D2      -   IP - instruction pointer (l.byte)
+0015: 04      -   IP - instruction pointer (h.byte)
+0016: 10      -   CS - code segment (l.byte)
+0017: 00      -   CS - code segment (h.byte)
+0018: 1E      -   relocation table adress (l.byte)
+0019: 00      -   relocation table adress (h.byte)
+001A: 00      -   overlay number (l.byte)
+001B: 00      -   overlay number (h.byte)
+001C: 01      -   signature (l.byte)
+001D: 00      -   signature (h.byte)
+001E: D3      -   relocation table - offset inside segment (l.byte)
+001F: 04      -   relocation table - offset inside segment (h.byte)
+0020: 10      -   relocation table - segment anchor (l.byte)
+0021: 00      -   relocation table - segment anchor (h.byte)
+0022 to 01FF  -   reserved relocation area  (00) 
+
+
+
+
+===================================================================================================
