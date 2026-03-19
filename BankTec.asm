@@ -7,11 +7,12 @@
 MAX_CUENTAS EQU 10
 TAM_NOMBRE  EQU 20
 
-OFF_NUMERO  EQU 0
-OFF_NOMBRE  EQU 2
-OFF_SALDO   EQU 22
-OFF_ESTADO  EQU 26
-TAM_CUENTA  EQU 27
+OFF_NUMERO      EQU 0
+OFF_NOMBRE      EQU 2
+OFF_SALDO_ENT   EQU 22
+OFF_SALDO_DEC   EQU 24
+OFF_ESTADO      EQU 26
+TAM_CUENTA      EQU 27
 
 .DATA
     ; -------------------------------
@@ -73,7 +74,7 @@ TAM_CUENTA  EQU 27
     msgSaldoActual      DB 13,10,'Saldo actual: $'
 
     ; -------------------------------
-    ; MENSAJES DE MOSTRAR REPORTE
+    ; MENSAJES DE REPORTE
     ; -------------------------------
     msgTotalActivas     DB 13,10,'Cuentas activas: $'
     msgTotalInactivas   DB 13,10,'Cuentas inactivas: $'
@@ -82,53 +83,61 @@ TAM_CUENTA  EQU 27
     msgMenorSaldo       DB 13,10,'Menor saldo: $'
 
     ; -------------------------------
+    ; MENSAJES DE DESACTIVAR
+    ; -------------------------------
+    msgPedirCuentaDes   DB 13,10,'Ingrese numero de cuenta a desactivar: $'
+    msgCuentaYaInactiva DB 13,10,'Error: la cuenta ya esta inactiva.',13,10,'$'
+    msgDesactivarOK     DB 13,10,'Cuenta desactivada correctamente.',13,10,'$'
+
+    ; -------------------------------
     ; MENSAJES GENERALES
     ; -------------------------------
     msgPresioneTecla    DB 13,10,'Presione una tecla para continuar...$'
 
     ; -------------------------------
     ; ESTRUCTURA EN MEMORIA
-    ; Cada cuenta ocupa 27 bytes:
-    ; [0-1]   numero   (WORD)
-    ; [2-21]  nombre   (20 bytes)
-    ; [22-25] saldo    (DWORD escalado x10000)
-    ; [26]    estado   (1=activa, 0=inactiva)
+    ; [0-1]   numero      WORD
+    ; [2-21]  nombre      20 bytes
+    ; [22-23] saldo ent   WORD
+    ; [24-25] saldo dec   WORD (0..9999)
+    ; [26]    estado      BYTE
     ; -------------------------------
-    cuentas         DB MAX_CUENTAS * TAM_CUENTA DUP(0)
-    totalCuentas    DB 0
+    cuentas             DB MAX_CUENTAS * TAM_CUENTA DUP(0)
+    totalCuentas        DB 0
 
     ; -------------------------------
     ; BUFFERS DE ENTRADA
-    ; INT 21h / AH=0Ah
     ; -------------------------------
-    bufferNumero    DB 5,0,5 DUP(0)
-    bufferNombre    DB 20,0,20 DUP(0)
-    bufferMonto     DB 15,0,15 DUP(0)
+    bufferNumero        DB 5,0,5 DUP(0)
+    bufferNombre        DB 20,0,20 DUP(0)
+    bufferMonto         DB 15,0,15 DUP(0)
 
     ; -------------------------------
     ; VARIABLES AUXILIARES
     ; -------------------------------
     tempNumero          DW 0
-    tempSaldoLo         DW 0
-    tempSaldoHi         DW 0
-    tempMontoLo         DW 0
-    tempMontoHi         DW 0
+    tempDirCuenta       DW 0
+
+    tempSaldoEnt        DW 0
+    tempSaldoDec        DW 0
+
+    tempMontoEnt        DW 0
+    tempMontoDec        DW 0
+
+    tempDigito          DW 0
 
     reporteActivas      DW 0
     reporteInactivas    DW 0
-    reporteSaldoTotalLo DW 0
-    reporteSaldoTotalHi DW 0
-    reporteMayorLo      DW 0
-    reporteMayorHi      DW 0
-    reporteMenorLo      DW 0
-    reporteMenorHi      DW 0
+    reporteSaldoEnt     DW 0
+    reporteSaldoDec     DW 0
+    reporteMayorEnt     DW 0
+    reporteMayorDec     DW 0
+    reporteMenorEnt     DW 0
+    reporteMenorDec     DW 0
 
-    flagPunto       DB 0
-    cantDecimales   DB 0
-    huboDigito      DB 0
-    digitoActual    DB 0
-
-    bufferImpresion DB 16 DUP(0)
+    flagPunto           DB 0
+    cantDecimales       DB 0
+    huboDigito          DB 0
 
 .CODE
 
@@ -200,9 +209,7 @@ OP_REPORTE:
 
 OP_DESACTIVAR:
     CALL LIMPIAR_PANTALLA
-    LEA DX, msgDesactivar
-    MOV AH, 09h
-    INT 21h
+    CALL DESACTIVAR_CUENTA
     CALL PAUSA
     JMP MENU_PRINCIPAL
 
@@ -217,11 +224,6 @@ MAIN ENDP
 
 ; ==================================================
 ; BUSCAR_CUENTA
-; Busca por numero en tempNumero
-; Salida:
-;   CF = 0 si encuentra
-;   CF = 1 si no encuentra
-;   DI = direccion base de la cuenta
 ; ==================================================
 BUSCAR_CUENTA:
     LEA DI, cuentas
@@ -248,7 +250,7 @@ ENCONTRADA:
     RET
 
 ; ==================================================
-; 4.2.1 CREAR CUENTA
+; CREAR CUENTA
 ; ==================================================
 CREAR_CUENTA PROC
     LEA DX, msgCrear
@@ -284,8 +286,8 @@ CREAR_CUENTA PROC
     CALL LEER_MONTO4
     JC MONTO_INVALIDO_CREAR
 
-    MOV [tempSaldoLo], AX
-    MOV [tempSaldoHi], DX
+    MOV [tempSaldoEnt], AX
+    MOV [tempSaldoDec], BX
 
     CALL OBTENER_DIRECCION_NUEVA_CUENTA
 
@@ -321,11 +323,11 @@ COPIAR_NOMBRE_NUEVO:
 FIN_COPIAR_NOMBRE_NUEVO:
     CALL OBTENER_DIRECCION_NUEVA_CUENTA
 
-    MOV AX, [tempSaldoLo]
-    MOV [DI + OFF_SALDO], AX
+    MOV AX, [tempSaldoEnt]
+    MOV [DI + OFF_SALDO_ENT], AX
 
-    MOV AX, [tempSaldoHi]
-    MOV [DI + OFF_SALDO + 2], AX
+    MOV AX, [tempSaldoDec]
+    MOV [DI + OFF_SALDO_DEC], AX
 
     MOV BYTE PTR [DI + OFF_ESTADO], 1
 
@@ -368,7 +370,7 @@ NOMBRE_INVALIDO_CREAR:
 CREAR_CUENTA ENDP
 
 ; ==================================================
-; 4.2.2 DEPOSITAR DINERO
+; DEPOSITAR DINERO
 ; ==================================================
 DEPOSITAR_DINERO PROC
     LEA DX, msgDepositar
@@ -381,12 +383,13 @@ DEPOSITAR_DINERO PROC
 
     CALL LEER_NUMERO
     JC NUMERO_INVALIDO_DEP
-
     MOV [tempNumero], AX
 
     CALL BUSCAR_CUENTA
     JC CUENTA_NO_EXISTE_DEP
+    MOV [tempDirCuenta], DI
 
+    MOV DI, [tempDirCuenta]
     CMP BYTE PTR [DI + OFF_ESTADO], 1
     JNE CUENTA_INACTIVA_DEP
 
@@ -397,20 +400,39 @@ DEPOSITAR_DINERO PROC
     CALL LEER_MONTO4
     JC MONTO_INVALIDO_DEP
 
-    OR DX, AX
-    JZ MONTO_INVALIDO_DEP
+    CMP AX, 0
+    JNE MONTO_OK_DEP
+    CMP BX, 0
+    JE MONTO_INVALIDO_DEP
 
-    MOV [tempMontoLo], AX
-    MOV [tempMontoHi], DX
+MONTO_OK_DEP:
+    MOV [tempMontoEnt], AX
+    MOV [tempMontoDec], BX
 
-    MOV AX, [DI + OFF_SALDO]
-    ADD AX, [tempMontoLo]
-    MOV [DI + OFF_SALDO], AX
+    MOV DI, [tempDirCuenta]
 
-    MOV AX, [DI + OFF_SALDO + 2]
-    ADC AX, [tempMontoHi]
-    MOV [DI + OFF_SALDO + 2], AX
+    ; sumar decimales
+    MOV AX, [DI + OFF_SALDO_DEC]
+    ADD AX, [tempMontoDec]
+    CMP AX, 10000
+    JB SIN_ACARREO_DEP
 
+    SUB AX, 10000
+    MOV [DI + OFF_SALDO_DEC], AX
+
+    MOV AX, [DI + OFF_SALDO_ENT]
+    ADD AX, [tempMontoEnt]
+    INC AX
+    MOV [DI + OFF_SALDO_ENT], AX
+    JMP FIN_DEP
+
+SIN_ACARREO_DEP:
+    MOV [DI + OFF_SALDO_DEC], AX
+    MOV AX, [DI + OFF_SALDO_ENT]
+    ADD AX, [tempMontoEnt]
+    MOV [DI + OFF_SALDO_ENT], AX
+
+FIN_DEP:
     LEA DX, msgDepositoOK
     MOV AH, 09h
     INT 21h
@@ -442,7 +464,7 @@ NUMERO_INVALIDO_DEP:
 DEPOSITAR_DINERO ENDP
 
 ; ==================================================
-; 4.2.3 RETIRAR DINERO
+; RETIRAR DINERO
 ; ==================================================
 RETIRAR_DINERO PROC
     LEA DX, msgRetirar
@@ -455,12 +477,13 @@ RETIRAR_DINERO PROC
 
     CALL LEER_NUMERO
     JC NUMERO_INVALIDO_RET
-
     MOV [tempNumero], AX
 
     CALL BUSCAR_CUENTA
     JC CUENTA_NO_EXISTE_RET
+    MOV [tempDirCuenta], DI
 
+    MOV DI, [tempDirCuenta]
     CMP BYTE PTR [DI + OFF_ESTADO], 1
     JNE CUENTA_INACTIVA_RET
 
@@ -471,30 +494,51 @@ RETIRAR_DINERO PROC
     CALL LEER_MONTO4
     JC MONTO_INVALIDO_RET
 
-    OR DX, AX
-    JZ MONTO_INVALIDO_RET
+    CMP AX, 0
+    JNE MONTO_OK_RET
+    CMP BX, 0
+    JE MONTO_INVALIDO_RET
 
-    MOV [tempMontoLo], AX
-    MOV [tempMontoHi], DX
+MONTO_OK_RET:
+    MOV [tempMontoEnt], AX
+    MOV [tempMontoDec], BX
 
-    MOV BX, [DI + OFF_SALDO + 2]
-    CMP BX, [tempMontoHi]
+    MOV DI, [tempDirCuenta]
+
+    ; comparar saldo con monto
+    MOV AX, [DI + OFF_SALDO_ENT]
+    CMP AX, [tempMontoEnt]
     JB FONDOS_INSUFICIENTES
-    JA RETIRO_OK_COMPARACION
+    JA RETIRO_PERMITIDO
 
-    MOV BX, [DI + OFF_SALDO]
-    CMP BX, [tempMontoLo]
+    MOV AX, [DI + OFF_SALDO_DEC]
+    CMP AX, [tempMontoDec]
     JB FONDOS_INSUFICIENTES
 
-RETIRO_OK_COMPARACION:
-    MOV AX, [DI + OFF_SALDO]
-    SUB AX, [tempMontoLo]
-    MOV [DI + OFF_SALDO], AX
+RETIRO_PERMITIDO:
+    MOV AX, [DI + OFF_SALDO_DEC]
+    CMP AX, [tempMontoDec]
+    JAE SIN_PRESTAMO_RET
 
-    MOV AX, [DI + OFF_SALDO + 2]
-    SBB AX, [tempMontoHi]
-    MOV [DI + OFF_SALDO + 2], AX
+    ADD AX, 10000
+    SUB AX, [tempMontoDec]
+    MOV [DI + OFF_SALDO_DEC], AX
 
+    MOV AX, [DI + OFF_SALDO_ENT]
+    SUB AX, [tempMontoEnt]
+    DEC AX
+    MOV [DI + OFF_SALDO_ENT], AX
+    JMP FIN_RET
+
+SIN_PRESTAMO_RET:
+    SUB AX, [tempMontoDec]
+    MOV [DI + OFF_SALDO_DEC], AX
+
+    MOV AX, [DI + OFF_SALDO_ENT]
+    SUB AX, [tempMontoEnt]
+    MOV [DI + OFF_SALDO_ENT], AX
+
+FIN_RET:
     LEA DX, msgRetiroOK
     MOV AH, 09h
     INT 21h
@@ -532,7 +576,7 @@ NUMERO_INVALIDO_RET:
 RETIRAR_DINERO ENDP
 
 ; ==================================================
-; 4.2.4 CONSULTAR SALDO
+; CONSULTAR SALDO
 ; ==================================================
 CONSULTAR_SALDO PROC
     LEA DX, msgConsultar
@@ -545,19 +589,27 @@ CONSULTAR_SALDO PROC
 
     CALL LEER_NUMERO
     JC NUMERO_INVALIDO_CON
-
     MOV [tempNumero], AX
 
     CALL BUSCAR_CUENTA
     JC CUENTA_NO_EXISTE_CON
+    MOV [tempDirCuenta], DI
 
     LEA DX, msgSaldoActual
     MOV AH, 09h
     INT 21h
 
-    MOV AX, [DI + OFF_SALDO]
-    MOV DX, [DI + OFF_SALDO + 2]
-    CALL IMPRIMIR_FIJO4
+    MOV DI, [tempDirCuenta]
+
+    MOV AX, [DI + OFF_SALDO_ENT]
+    CALL IMPRIMIR_NUMERO
+
+    MOV DL, '.'
+    MOV AH, 02h
+    INT 21h
+
+    MOV BX, [DI + OFF_SALDO_DEC]
+    CALL IMPRIMIR_4DIGITOS
     RET
 
 CUENTA_NO_EXISTE_CON:
@@ -574,7 +626,7 @@ NUMERO_INVALIDO_CON:
 CONSULTAR_SALDO ENDP
 
 ; ==================================================
-; 4.2.5 REPORTE GENERAL
+; REPORTE GENERAL
 ; ==================================================
 REPORTE_GENERAL PROC
     LEA DX, msgReporte
@@ -583,12 +635,12 @@ REPORTE_GENERAL PROC
 
     MOV WORD PTR [reporteActivas], 0
     MOV WORD PTR [reporteInactivas], 0
-    MOV WORD PTR [reporteSaldoTotalLo], 0
-    MOV WORD PTR [reporteSaldoTotalHi], 0
-    MOV WORD PTR [reporteMayorLo], 0
-    MOV WORD PTR [reporteMayorHi], 0
-    MOV WORD PTR [reporteMenorLo], 0
-    MOV WORD PTR [reporteMenorHi], 0
+    MOV WORD PTR [reporteSaldoEnt], 0
+    MOV WORD PTR [reporteSaldoDec], 0
+    MOV WORD PTR [reporteMayorEnt], 0
+    MOV WORD PTR [reporteMayorDec], 0
+    MOV WORD PTR [reporteMenorEnt], 0
+    MOV WORD PTR [reporteMenorDec], 0
 
     XOR CH, CH
     MOV CL, [totalCuentas]
@@ -597,65 +649,79 @@ REPORTE_GENERAL PROC
 
     LEA DI, cuentas
 
-    MOV AX, [DI + OFF_SALDO]
-    MOV [reporteMayorLo], AX
-    MOV [reporteMenorLo], AX
+    MOV AX, [DI + OFF_SALDO_ENT]
+    MOV [reporteMayorEnt], AX
+    MOV [reporteMenorEnt], AX
 
-    MOV AX, [DI + OFF_SALDO + 2]
-    MOV [reporteMayorHi], AX
-    MOV [reporteMenorHi], AX
+    MOV AX, [DI + OFF_SALDO_DEC]
+    MOV [reporteMayorDec], AX
+    MOV [reporteMenorDec], AX
 
 REPORTE_LOOP:
     CMP BYTE PTR [DI + OFF_ESTADO], 1
-    JE ES_ACTIVA
+    JE CUENTA_ACTIVA_REP
 
     INC WORD PTR [reporteInactivas]
-    JMP PROCESAR_SALDO
+    JMP PROCESAR_SALDO_REP
 
-ES_ACTIVA:
+CUENTA_ACTIVA_REP:
     INC WORD PTR [reporteActivas]
 
-PROCESAR_SALDO:
-    MOV AX, [reporteSaldoTotalLo]
-    ADD AX, [DI + OFF_SALDO]
-    MOV [reporteSaldoTotalLo], AX
+PROCESAR_SALDO_REP:
+    ; sumar saldo total
+    MOV AX, [reporteSaldoDec]
+    ADD AX, [DI + OFF_SALDO_DEC]
+    CMP AX, 10000
+    JB REP_SIN_ACARREO
 
-    MOV AX, [reporteSaldoTotalHi]
-    ADC AX, [DI + OFF_SALDO + 2]
-    MOV [reporteSaldoTotalHi], AX
+    SUB AX, 10000
+    MOV [reporteSaldoDec], AX
+    INC WORD PTR [reporteSaldoEnt]
+    JMP REP_SUMAR_ENTERO
 
-    MOV AX, [DI + OFF_SALDO + 2]
-    CMP AX, [reporteMayorHi]
+REP_SIN_ACARREO:
+    MOV [reporteSaldoDec], AX
+
+REP_SUMAR_ENTERO:
+    MOV AX, [reporteSaldoEnt]
+    ADD AX, [DI + OFF_SALDO_ENT]
+    MOV [reporteSaldoEnt], AX
+
+    ; mayor saldo
+    MOV AX, [DI + OFF_SALDO_ENT]
+    CMP AX, [reporteMayorEnt]
     JA ACTUALIZAR_MAYOR
     JB VERIFICAR_MENOR
-    MOV AX, [DI + OFF_SALDO]
-    CMP AX, [reporteMayorLo]
-    JA ACTUALIZAR_MAYOR
-    JMP VERIFICAR_MENOR
 
-ACTUALIZAR_MAYOR:
-    MOV AX, [DI + OFF_SALDO]
-    MOV [reporteMayorLo], AX
-    MOV AX, [DI + OFF_SALDO + 2]
-    MOV [reporteMayorHi], AX
+    MOV AX, [DI + OFF_SALDO_DEC]
+    CMP AX, [reporteMayorDec]
+    JA ACTUALIZAR_MAYOR
 
 VERIFICAR_MENOR:
-    MOV AX, [DI + OFF_SALDO + 2]
-    CMP AX, [reporteMenorHi]
+    MOV AX, [DI + OFF_SALDO_ENT]
+    CMP AX, [reporteMenorEnt]
     JB ACTUALIZAR_MENOR
-    JA SIGUIENTE_CUENTA
-    MOV AX, [DI + OFF_SALDO]
-    CMP AX, [reporteMenorLo]
+    JA SIGUIENTE_REP
+
+    MOV AX, [DI + OFF_SALDO_DEC]
+    CMP AX, [reporteMenorDec]
     JB ACTUALIZAR_MENOR
-    JMP SIGUIENTE_CUENTA
+    JMP SIGUIENTE_REP
+
+ACTUALIZAR_MAYOR:
+    MOV AX, [DI + OFF_SALDO_ENT]
+    MOV [reporteMayorEnt], AX
+    MOV AX, [DI + OFF_SALDO_DEC]
+    MOV [reporteMayorDec], AX
+    JMP VERIFICAR_MENOR
 
 ACTUALIZAR_MENOR:
-    MOV AX, [DI + OFF_SALDO]
-    MOV [reporteMenorLo], AX
-    MOV AX, [DI + OFF_SALDO + 2]
-    MOV [reporteMenorHi], AX
+    MOV AX, [DI + OFF_SALDO_ENT]
+    MOV [reporteMenorEnt], AX
+    MOV AX, [DI + OFF_SALDO_DEC]
+    MOV [reporteMenorDec], AX
 
-SIGUIENTE_CUENTA:
+SIGUIENTE_REP:
     ADD DI, TAM_CUENTA
     LOOP REPORTE_LOOP
 
@@ -675,53 +741,105 @@ MOSTRAR_RESULTADOS:
     LEA DX, msgSaldoBanco
     MOV AH, 09h
     INT 21h
-    MOV AX, [reporteSaldoTotalLo]
-    MOV DX, [reporteSaldoTotalHi]
-    CALL IMPRIMIR_FIJO4
+    MOV AX, [reporteSaldoEnt]
+    CALL IMPRIMIR_NUMERO
+    MOV DL, '.'
+    MOV AH, 02h
+    INT 21h
+    MOV BX, [reporteSaldoDec]
+    CALL IMPRIMIR_4DIGITOS
 
     LEA DX, msgMayorSaldo
     MOV AH, 09h
     INT 21h
-    MOV AX, [reporteMayorLo]
-    MOV DX, [reporteMayorHi]
-    CALL IMPRIMIR_FIJO4
+    MOV AX, [reporteMayorEnt]
+    CALL IMPRIMIR_NUMERO
+    MOV DL, '.'
+    MOV AH, 02h
+    INT 21h
+    MOV BX, [reporteMayorDec]
+    CALL IMPRIMIR_4DIGITOS
 
     LEA DX, msgMenorSaldo
     MOV AH, 09h
     INT 21h
-    MOV AX, [reporteMenorLo]
-    MOV DX, [reporteMenorHi]
-    CALL IMPRIMIR_FIJO4
+    MOV AX, [reporteMenorEnt]
+    CALL IMPRIMIR_NUMERO
+    MOV DL, '.'
+    MOV AH, 02h
+    INT 21h
+    MOV BX, [reporteMenorDec]
+    CALL IMPRIMIR_4DIGITOS
 
     RET
 REPORTE_GENERAL ENDP
 
 ; ==================================================
+; DESACTIVAR CUENTA
+; ==================================================
+DESACTIVAR_CUENTA PROC
+    LEA DX, msgDesactivar
+    MOV AH, 09h
+    INT 21h
+
+    LEA DX, msgPedirCuentaDes
+    MOV AH, 09h
+    INT 21h
+
+    CALL LEER_NUMERO
+    JC NUMERO_INVALIDO_DES
+    MOV [tempNumero], AX
+
+    CALL BUSCAR_CUENTA
+    JC CUENTA_NO_EXISTE_DES
+    MOV [tempDirCuenta], DI
+
+    MOV DI, [tempDirCuenta]
+    CMP BYTE PTR [DI + OFF_ESTADO], 0
+    JE CUENTA_YA_INACTIVA
+
+    MOV BYTE PTR [DI + OFF_ESTADO], 0
+
+    LEA DX, msgDesactivarOK
+    MOV AH, 09h
+    INT 21h
+    RET
+
+CUENTA_NO_EXISTE_DES:
+    LEA DX, msgCuentaNoExiste
+    MOV AH, 09h
+    INT 21h
+    RET
+
+CUENTA_YA_INACTIVA:
+    LEA DX, msgCuentaYaInactiva
+    MOV AH, 09h
+    INT 21h
+    RET
+
+NUMERO_INVALIDO_DES:
+    LEA DX, msgNumeroInvalido
+    MOV AH, 09h
+    INT 21h
+    RET
+DESACTIVAR_CUENTA ENDP
+
+; ==================================================
 ; OBTENER_DIRECCION_NUEVA_CUENTA
-; Salida:
-;   DI = direccion del siguiente espacio libre
 ; ==================================================
 OBTENER_DIRECCION_NUEVA_CUENTA PROC
     LEA DI, cuentas
-
     XOR AX, AX
     MOV AL, [totalCuentas]
-
     MOV BL, TAM_CUENTA
     MUL BL
-
     ADD DI, AX
     RET
 OBTENER_DIRECCION_NUEVA_CUENTA ENDP
 
 ; ==================================================
 ; LEER_NUMERO
-; Entrada:
-;   bufferNumero
-; Salida:
-;   AX = numero
-;   CF = 0 si correcto
-;   CF = 1 si invalido
+; Devuelve AX
 ; ==================================================
 LEER_NUMERO PROC
     LEA DX, bufferNumero
@@ -740,7 +858,7 @@ LEER_NUMERO PROC
     LEA SI, bufferNumero + 2
     XOR AX, AX
 
-CONVERTIR_LOOP:
+CONVERTIR_LOOP_NUM:
     MOV BL, [SI]
 
     CMP BL, '0'
@@ -751,9 +869,11 @@ CONVERTIR_LOOP:
 
     SUB BL, '0'
 
-    MOV DX, 0
+    PUSH CX
     MOV CX, 10
     MUL CX
+    POP CX
+
     CMP DX, 0
     JNE NUMERO_INVALIDO
 
@@ -762,8 +882,8 @@ CONVERTIR_LOOP:
     JC NUMERO_INVALIDO
 
     INC SI
-    DEC BYTE PTR [bufferNumero + 1]
-    JNZ CONVERTIR_LOOP
+    DEC CL
+    JNZ CONVERTIR_LOOP_NUM
 
     CLC
     RET
@@ -775,58 +895,96 @@ LEER_NUMERO ENDP
 
 ; ==================================================
 ; LEER_MONTO4
-; Lee un monto con hasta 4 decimales
-; Devuelve DX:AX escalado por 10000
+; Devuelve:
+;   AX = parte entera
+;   BX = parte decimal (0..9999)
+; Acepta:
+;   123
+;   123.4
+;   123.45
+;   123.456
+;   123.4567
 ; ==================================================
 LEER_MONTO4 PROC
     LEA DX, bufferMonto
     MOV AH, 0Ah
     INT 21h
 
+    XOR AX, AX            ; entero
+    XOR BX, BX            ; decimal
+
+    MOV BYTE PTR [flagPunto], 0
+    MOV BYTE PTR [cantDecimales], 0
+    MOV BYTE PTR [huboDigito], 0
+
+    XOR CH, CH
     MOV CL, [bufferMonto + 1]
     CMP CL, 0
     JE MONTO4_INVALIDO
 
     LEA SI, bufferMonto + 2
 
-    MOV BYTE PTR [flagPunto], 0
-    MOV BYTE PTR [cantDecimales], 0
-    MOV BYTE PTR [huboDigito], 0
-
-    XOR AX, AX
-    XOR DX, DX
-
 PARSE_MONTO_LOOP:
-    MOV BL, [SI]
+    MOV DL, [SI]
 
-    CMP BL, '.'
+    CMP DL, '.'
     JE ES_PUNTO_MONTO
 
-    CMP BL, '0'
+    CMP DL, '0'
     JB MONTO4_INVALIDO
-    CMP BL, '9'
+    CMP DL, '9'
     JA MONTO4_INVALIDO
 
     MOV BYTE PTR [huboDigito], 1
 
-    SUB BL, '0'
-    MOV [digitoActual], BL
-
-    CALL MUL32X10
-
-    MOV BL, [digitoActual]
-    XOR BH, BH
-    ADD AX, BX
-    ADC DX, 0
-    JC MONTO4_INVALIDO
+    SUB DL, '0'
+    XOR DH, DH
+    MOV [tempDigito], DX
 
     CMP BYTE PTR [flagPunto], 0
-    JE SIG_CHAR_MONTO
+    JE ACUMULAR_ENTERO
+
+    ; decimal = decimal * 10 + digito
+    CMP BYTE PTR [cantDecimales], 4
+    JAE MONTO4_INVALIDO
+
+    PUSH AX
+    PUSH CX
+    MOV AX, BX
+    MOV CX, 10
+    MUL CX
+    POP CX
+    CMP DX, 0
+    JNE ERROR_DECIMAL
+    ADD AX, [tempDigito]
+    JC ERROR_DECIMAL
+    MOV BX, AX
+    POP AX
 
     INC BYTE PTR [cantDecimales]
-    CMP BYTE PTR [cantDecimales], 4
-    JA MONTO4_INVALIDO
     JMP SIG_CHAR_MONTO
+
+ERROR_DECIMAL:
+    POP AX
+    JMP MONTO4_INVALIDO
+
+ACUMULAR_ENTERO:
+    ; entero = entero * 10 + digito
+    PUSH BX
+    PUSH CX
+    MOV CX, 10
+    MUL CX
+    POP CX
+    CMP DX, 0
+    JNE ERROR_ENTERO
+    ADD AX, [tempDigito]
+    JC ERROR_ENTERO
+    POP BX
+    JMP SIG_CHAR_MONTO
+
+ERROR_ENTERO:
+    POP BX
+    JMP MONTO4_INVALIDO
 
 ES_PUNTO_MONTO:
     CMP BYTE PTR [flagPunto], 0
@@ -841,15 +999,28 @@ SIG_CHAR_MONTO:
     CMP BYTE PTR [huboDigito], 1
     JNE MONTO4_INVALIDO
 
-    MOV BL, 4
-    SUB BL, [cantDecimales]
-
-ESCALAR_A_4:
-    CMP BL, 0
+    ; completar a 4 decimales
+PAD_DECIMALES:
+    CMP BYTE PTR [cantDecimales], 4
     JE MONTO4_OK
-    CALL MUL32X10
-    DEC BL
-    JMP ESCALAR_A_4
+
+    PUSH AX
+    PUSH CX
+    MOV AX, BX
+    MOV CX, 10
+    MUL CX
+    POP CX
+    CMP DX, 0
+    JNE ERROR_PAD
+    MOV BX, AX
+    POP AX
+
+    INC BYTE PTR [cantDecimales]
+    JMP PAD_DECIMALES
+
+ERROR_PAD:
+    POP AX
+    JMP MONTO4_INVALIDO
 
 MONTO4_OK:
     CLC
@@ -859,186 +1030,6 @@ MONTO4_INVALIDO:
     STC
     RET
 LEER_MONTO4 ENDP
-
-; ==================================================
-; MUL32X10
-; Multiplica DX:AX por 10
-; ==================================================
-MUL32X10 PROC
-    PUSH BX
-    PUSH CX
-    PUSH SI
-    PUSH DI
-
-    MOV BX, AX
-    MOV CX, DX
-
-    SHL AX, 1
-    RCL DX, 1
-    MOV SI, AX
-    MOV DI, DX
-
-    MOV AX, BX
-    MOV DX, CX
-
-    SHL AX, 1
-    RCL DX, 1
-    SHL AX, 1
-    RCL DX, 1
-    SHL AX, 1
-    RCL DX, 1
-
-    ADD AX, SI
-    ADC DX, DI
-
-    POP DI
-    POP SI
-    POP CX
-    POP BX
-    RET
-MUL32X10 ENDP
-
-; ==================================================
-; DIV32X10
-; Divide DX:AX entre 10
-; Salida:
-;   DX:AX = cociente
-;   BL = residuo
-; ==================================================
-DIV32X10 PROC
-    PUSH SI
-    PUSH CX
-
-    MOV SI, AX
-    MOV BX, 10
-
-    MOV AX, DX
-    XOR DX, DX
-    DIV BX
-    MOV CX, AX
-
-    MOV AX, SI
-    DIV BX
-    MOV BL, DL
-
-    MOV DX, CX
-
-    POP CX
-    POP SI
-    RET
-DIV32X10 ENDP
-
-; ==================================================
-; IMPRIMIR_FIJO4
-; Imprime DX:AX con 4 decimales
-; ==================================================
-IMPRIMIR_FIJO4 PROC
-    PUSH AX
-    PUSH BX
-    PUSH CX
-    PUSH DX
-    PUSH SI
-    PUSH DI
-
-    LEA DI, bufferImpresion + 16
-    MOV CX, 0
-
-    OR DX, AX
-    JNE CONVERTIR_32
-
-    DEC DI
-    MOV BYTE PTR [DI], '0'
-    INC CX
-    JMP FORMATEAR_4
-
-CONVERTIR_32:
-    CALL DIV32X10
-    DEC DI
-    ADD BL, '0'
-    MOV [DI], BL
-    INC CX
-    OR DX, AX
-    JNE CONVERTIR_32
-
-FORMATEAR_4:
-    MOV SI, DI
-
-    CMP CX, 4
-    JA IMPR_ENTERO_DEC
-
-    MOV DL, '0'
-    MOV AH, 02h
-    INT 21h
-
-    MOV DL, '.'
-    MOV AH, 02h
-    INT 21h
-
-    MOV BX, 4
-    SUB BX, CX
-
-PONER_CEROS:
-    CMP BX, 0
-    JE IMPR_RESTO_DEC
-    MOV DL, '0'
-    MOV AH, 02h
-    INT 21h
-    DEC BX
-    JMP PONER_CEROS
-
-IMPR_RESTO_DEC:
-    MOV BX, CX
-
-IMPR_DEC_CORTO:
-    CMP BX, 0
-    JE FIN_IMP_FIJO4
-    MOV DL, [SI]
-    MOV AH, 02h
-    INT 21h
-    INC SI
-    DEC BX
-    JMP IMPR_DEC_CORTO
-
-IMPR_ENTERO_DEC:
-    MOV BX, CX
-    SUB BX, 4
-
-IMPR_ENTERO:
-    CMP BX, 0
-    JE PONER_PUNTO_DEC
-    MOV DL, [SI]
-    MOV AH, 02h
-    INT 21h
-    INC SI
-    DEC BX
-    JMP IMPR_ENTERO
-
-PONER_PUNTO_DEC:
-    MOV DL, '.'
-    MOV AH, 02h
-    INT 21h
-
-    MOV BX, 4
-
-IMPR_DEC_LARGO:
-    CMP BX, 0
-    JE FIN_IMP_FIJO4
-    MOV DL, [SI]
-    MOV AH, 02h
-    INT 21h
-    INC SI
-    DEC BX
-    JMP IMPR_DEC_LARGO
-
-FIN_IMP_FIJO4:
-    POP DI
-    POP SI
-    POP DX
-    POP CX
-    POP BX
-    POP AX
-    RET
-IMPRIMIR_FIJO4 ENDP
 
 ; ==================================================
 ; LEER_NOMBRE
@@ -1136,7 +1127,6 @@ LIMPIAR_PANTALLA ENDP
 
 ; ==================================================
 ; IMPRIMIR_NUMERO
-; Imprime AX en decimal
 ; ==================================================
 IMPRIMIR_NUMERO PROC
     PUSH AX
@@ -1147,26 +1137,96 @@ IMPRIMIR_NUMERO PROC
     XOR CX, CX
     MOV BX, 10
 
-DIVISION_LOOP:
+    CMP AX, 0
+    JNE DIVISION_LOOP_NUM
+    MOV DL, '0'
+    MOV AH, 02h
+    INT 21h
+    JMP FIN_IMP_NUM
+
+DIVISION_LOOP_NUM:
     XOR DX, DX
     DIV BX
     PUSH DX
     INC CX
     CMP AX, 0
-    JNE DIVISION_LOOP
+    JNE DIVISION_LOOP_NUM
 
-IMPRIMIR_LOOP:
+IMPRIMIR_LOOP_NUM:
     POP DX
     ADD DL, '0'
     MOV AH, 02h
     INT 21h
-    LOOP IMPRIMIR_LOOP
+    LOOP IMPRIMIR_LOOP_NUM
 
+FIN_IMP_NUM:
     POP DX
     POP CX
     POP BX
     POP AX
     RET
 IMPRIMIR_NUMERO ENDP
+
+; ==================================================
+; IMPRIMIR_4DIGITOS
+; Imprime BX con 4 digitos y ceros a la izquierda
+; ==================================================
+IMPRIMIR_4DIGITOS PROC
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+
+    ; -------------------------
+    ; Miles
+    ; -------------------------
+    MOV AX, BX
+    XOR DX, DX
+    MOV CX, 1000
+    DIV CX              ; AX = millares, DX = residuo
+    ADD AL, '0'
+    MOV DL, AL
+    MOV AH, 02h
+    INT 21h
+
+    ; -------------------------
+    ; Centenas
+    ; -------------------------
+    MOV AX, DX
+    XOR DX, DX
+    MOV CX, 100
+    DIV CX              ; AX = centenas, DX = residuo
+    ADD AL, '0'
+    MOV DL, AL
+    MOV AH, 02h
+    INT 21h
+
+    ; -------------------------
+    ; Decenas
+    ; -------------------------
+    MOV AX, DX
+    XOR DX, DX
+    MOV CX, 10
+    DIV CX              ; AX = decenas, DX = unidades
+    ADD AL, '0'
+    MOV DL, AL
+    MOV AH, 02h
+    INT 21h
+
+    ; -------------------------
+    ; Unidades
+    ; -------------------------
+    MOV AL, DL          ; tomar residuo final
+    ADD AL, '0'
+    MOV DL, AL
+    MOV AH, 02h
+    INT 21h
+
+    POP DX
+    POP CX
+    POP BX
+    POP AX
+    RET
+IMPRIMIR_4DIGITOS ENDP
 
 END MAIN
