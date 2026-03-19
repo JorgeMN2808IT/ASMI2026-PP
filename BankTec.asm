@@ -209,7 +209,6 @@ OP_REPORTE:
 
 OP_DESACTIVAR:
     CALL LIMPIAR_PANTALLA
-    CALL DESACTIVAR_CUENTA
     CALL PAUSA
     JMP MENU_PRINCIPAL
 
@@ -773,57 +772,6 @@ MOSTRAR_RESULTADOS:
 
     RET
 REPORTE_GENERAL ENDP
-
-; ==================================================
-; DESACTIVAR CUENTA
-; ==================================================
-DESACTIVAR_CUENTA PROC
-    LEA DX, msgDesactivar
-    MOV AH, 09h
-    INT 21h
-
-    LEA DX, msgPedirCuentaDes
-    MOV AH, 09h
-    INT 21h
-
-    CALL LEER_NUMERO
-    JC NUMERO_INVALIDO_DES
-    MOV [tempNumero], AX
-
-    CALL BUSCAR_CUENTA
-    JC CUENTA_NO_EXISTE_DES
-    MOV [tempDirCuenta], DI
-
-    MOV DI, [tempDirCuenta]
-    CMP BYTE PTR [DI + OFF_ESTADO], 0
-    JE CUENTA_YA_INACTIVA
-
-    MOV BYTE PTR [DI + OFF_ESTADO], 0
-
-    LEA DX, msgDesactivarOK
-    MOV AH, 09h
-    INT 21h
-    RET
-
-CUENTA_NO_EXISTE_DES:
-    LEA DX, msgCuentaNoExiste
-    MOV AH, 09h
-    INT 21h
-    RET
-
-CUENTA_YA_INACTIVA:
-    LEA DX, msgCuentaYaInactiva
-    MOV AH, 09h
-    INT 21h
-    RET
-
-NUMERO_INVALIDO_DES:
-    LEA DX, msgNumeroInvalido
-    MOV AH, 09h
-    INT 21h
-    RET
-DESACTIVAR_CUENTA ENDP
-
 ; ==================================================
 ; OBTENER_DIRECCION_NUEVA_CUENTA
 ; ==================================================
@@ -910,8 +858,8 @@ LEER_MONTO4 PROC
     MOV AH, 0Ah
     INT 21h
 
-    XOR AX, AX            ; entero
-    XOR BX, BX            ; decimal
+    XOR AX, AX            ; parte entera
+    XOR BX, BX            ; parte decimal
 
     MOV BYTE PTR [flagPunto], 0
     MOV BYTE PTR [cantDecimales], 0
@@ -944,7 +892,9 @@ PARSE_MONTO_LOOP:
     CMP BYTE PTR [flagPunto], 0
     JE ACUMULAR_ENTERO
 
-    ; decimal = decimal * 10 + digito
+    ; --------------------------------
+    ; parte decimal: BX = BX * 10 + digito
+    ; --------------------------------
     CMP BYTE PTR [cantDecimales], 4
     JAE MONTO4_INVALIDO
 
@@ -969,7 +919,9 @@ ERROR_DECIMAL:
     JMP MONTO4_INVALIDO
 
 ACUMULAR_ENTERO:
-    ; entero = entero * 10 + digito
+    ; --------------------------------
+    ; parte entera: AX = AX * 10 + digito
+    ; --------------------------------
     PUSH BX
     PUSH CX
     MOV CX, 10
@@ -1177,48 +1129,41 @@ IMPRIMIR_4DIGITOS PROC
     PUSH CX
     PUSH DX
 
-    ; -------------------------
     ; Miles
-    ; -------------------------
     MOV AX, BX
     XOR DX, DX
     MOV CX, 1000
-    DIV CX              ; AX = millares, DX = residuo
+    DIV CX
     ADD AL, '0'
     MOV DL, AL
     MOV AH, 02h
     INT 21h
 
-    ; -------------------------
     ; Centenas
-    ; -------------------------
     MOV AX, DX
     XOR DX, DX
     MOV CX, 100
-    DIV CX              ; AX = centenas, DX = residuo
+    DIV CX
     ADD AL, '0'
     MOV DL, AL
     MOV AH, 02h
     INT 21h
 
-    ; -------------------------
-    ; Decenas
-    ; -------------------------
+    ; Decenas y unidades
     MOV AX, DX
     XOR DX, DX
     MOV CX, 10
     DIV CX              ; AX = decenas, DX = unidades
+
+    PUSH DX             ; guardar unidades reales
+
     ADD AL, '0'
     MOV DL, AL
     MOV AH, 02h
     INT 21h
 
-    ; -------------------------
-    ; Unidades
-    ; -------------------------
-    MOV AL, DL          ; tomar residuo final
-    ADD AL, '0'
-    MOV DL, AL
+    POP DX              ; recuperar unidades
+    ADD DL, '0'
     MOV AH, 02h
     INT 21h
 
