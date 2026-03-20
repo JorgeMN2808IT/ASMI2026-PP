@@ -209,6 +209,7 @@ OP_REPORTE:
 
 OP_DESACTIVAR:
     CALL LIMPIAR_PANTALLA
+    CALL DESACTIVAR_CUENTA
     CALL PAUSA
     JMP MENU_PRINCIPAL
 
@@ -771,7 +772,65 @@ MOSTRAR_RESULTADOS:
     CALL IMPRIMIR_4DIGITOS
 
     RET
-REPORTE_GENERAL ENDP
+REPORTE_GENERAL ENDP 
+
+; ==================================================
+; DESACTIVAR_CUENTA
+; ==================================================
+DESACTIVAR_CUENTA PROC
+    LEA DX, msgDesactivar
+    MOV AH, 09h
+    INT 21h
+    
+    LEA DX, msgPedirCuentaDes
+    MOV AH, 09h
+    INT 21h
+    
+    CALL LEER_NUMERO
+    JC NUMERO_INVALIDO_DES
+    
+    MOV [tempNumero], AX
+    
+    CALL BUSCAR_CUENTA
+    JC CUENTA_NO_EXISTE_DES
+    
+    MOV [tempDirCuenta], DI
+    
+    MOV DI, [tempDirCuenta]
+    
+    CMP BYTE PTR [DI + OFF_ESTADO], 1
+    JNE CUENTA_YA_INACTIVA
+    
+    ;cambia el estado
+    MOV BYTE PTR [DI + OFF_ESTADO], 0
+    
+    LEA DX, msgDesactivarOK
+    MOV AH, 09h
+    INT 21h
+    RET
+    
+CUENTA_YA_INACTIVA:
+    LEA DX, msgCuentaYaInactiva
+    MOV AH, 09h
+    INT 21h
+    RET
+    
+CUENTA_NO_EXISTE_DES:
+    LEA DX, msgCuentaNoExiste
+    MOV AH, 09h
+    INT 21h
+    RET
+    
+NUMERO_INVALIDO_DES:
+    LEA DX, msgNumeroInvalido
+    MOV AH,09h
+    INT 21h
+    RET
+
+DESACTIVAR_CUENTA ENDP
+    
+
+
 ; ==================================================
 ; OBTENER_DIRECCION_NUEVA_CUENTA
 ; ==================================================
